@@ -474,18 +474,35 @@
             <p class="text-gray-400">Section in development: Individual statistics per swimmer.</p>
         </section>
 
-        <section id="compare" class="tab-content hidden text-center p-10">
-            <i class="fa-solid fa-chart-line text-6xl text-gray-200 mb-4"></i>
-            <p class="text-gray-400">Section in development: Head-to-head analysis.</p>
-        </section>
+       <section id="compare" class="tab-content hidden animate-fade-in">
+    <div class="bg-white p-6 rounded-3xl shadow-sm">
+        <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+            <i class="fa-solid fa-right-left text-blue-500"></i> Head - to - Head
+        </h2>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div>
+                <label class="text-[10px] font-bold uppercase text-gray-400 ml-2">Swimmer 1</label>
+                <select id="swimmer1" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200">
+                    <option>esteban</option><option>jonathan</option><option>My Profile</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] font-bold uppercase text-gray-400 ml-2">Swimmer 2</label>
+                <select id="swimmer2" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200" onchange="compareSwimmers()">
+                    <option selected disabled>Select...</option>
+                    <option>esteban</option><option>jonathan</option><option>My Profile</option>
+                </select>
+            </div>
+        </div>
 
-    </main>
-
-    <style>
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
-    </style>
+        <div id="compare-results">
+            <div class="text-center py-10">
+                <i class="fa-solid fa-users-viewfinder text-4xl text-gray-200 mb-2"></i>
+                <p class="text-gray-400 text-sm">Select two swimmers to compare their personal bests</p>
+            </div>
+        </div>
+    </div>
+</section>
 </body>
 </html>
