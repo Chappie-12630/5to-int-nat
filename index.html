@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwimTracker Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // CONFIGURACIÓN DE FIREBASE
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "tu-app.firebaseapp.com",
+            projectId: "tu-app",
+            storageBucket: "tu-app.appspot.com",
+            messagingSenderId: "12345678",
+            appId: "tu-app-id"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- NAVEGACIÓN ---
+        window.showTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            // Actualizar estilo de botones
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('bg-blue-600', 'text-white'));
+            event.currentTarget.classList.add('bg-blue-600', 'text-white');
+
+            if(tabId === 'leaderboard') loadLeaderboard();
+            if(tabId === 'records') loadRecords();
+            if(tabId === 'profiles') loadProfiles();
+        };
+
+        // --- LÓGICA DE GUARDADO ---
+        window.saveTime = async (e) => {
+            e.preventDefault();
+            const placement = parseInt(document.getElementById('placement').value);
+            const points = Math.max(0, 21 - placement);
+
+            const data = {
+                swimmer: document.getElementById('swimmer').value,
+                distance: document.getElementById('distance').value,
+                style: document.getElementById('style').value,
+                poolSize: document.getElementById('poolSize').value,
+                minutes: parseInt(document.getElementById('min').value || 0),
+                seconds: parseInt(document.getElementById('sec').value || 0),
+                ms: parseInt(document.getElementById('ms').value || 0),
+                placement,
+                points,
+                competition: document.getElementById('competition').value,
+                location: document.getElementById('location').value,
+                date: document.getElementById('date').value,
+                timestamp: Date.now()
+            };
+
+            await addDoc(collection(db, "swims"), data);
+            alert("Tiempo guardado!");
+            showTab('leaderboard');
+        };
+
+        // --- CARGAR LEADERBOARD ---
+        async function loadLeaderboard() {
+            const querySnapshot = await getDocs(collection(db, "swims"));
+            const totals = {};
+            querySnapshot.forEach(doc => {
+                const d = doc.data();
+                totals[d.swimmer] = (totals[d.swimmer] || 0) + d.points;
+            });
+
+            const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+            const container = document.getElementById('leaderboard-list');
+            container.innerHTML = sorted.map(([name, pts], i) => `
+                <div class="flex justify-between items-center p-4 border-b">
+                    <div class="flex items-center gap-4">
+                        <span class="text-xl font-bold ${i==0?'text-yellow-500':''}">${i+1}</span>
+                        <div>
+                            <p class="font-bold capitalize">${name}</p>
+                            <p class="text-xs text-gray-400">Swimmer</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xl font-bold text-blue-600">${pts}</p>
+                        <p class="text-[10px] uppercase text-gray-400 font-bold">Points</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- CARGAR RÉCORDS ---
+        async function loadRecords() {
+            const querySnapshot = await getDocs(collection(db, "swims"));
+            const records = {};
+            querySnapshot.forEach(doc => {
+                const d = doc.data();
+                const key = `${d.distance} ${d.style}`;
+                const totalMs = (d.minutes * 60000) + (d.seconds * 1000) + d.ms;
+                
+                if (!records[key] || totalMs < records[key].totalMs) {
+                    records[key] = { ...d, totalMs };
+                }
+            });
+
+            document.getElementById('records-list').innerHTML = Object.entries(records).map(([event, data]) => `
+                <div class="p-4 bg-gray-50 rounded-xl mb-2 flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-bold text-blue-500 uppercase">${event}</p>
+                        <p class="font-bold capitalize">${data.swimmer}</p>
+                    </div>
+                    <p class="text-lg font-mono">${data.minutes}:${data.seconds}.${data.ms}</p>
+                </div>
+            `).join('');
+        }
+
+        // Iniciar en Leaderboard
+        window.onload = () => loadLeaderboard();
+    </script>
+</head>
+<body class="bg-slate-50 min-h-screen pb-20">
+
+    <header class="bg-white p-6 text-center border-b sticky top-0 z-10">
+        <h1 class="text-2xl font-black text-slate-800 tracking-tight">
+            <i class="fa-solid fa-water text-blue-500"></i> SwimTracker
+        </h1>
+    </header>
+
+    <nav class="flex overflow-x-auto bg-white border-b px-2 py-3 gap-2 sticky top-[73px] z-10 no-scrollbar">
+        <button onclick="showTab('leaderboard')" class="nav-btn bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap">
+            <i class="fa-solid fa-trophy mr-1"></i> Leaderboard
+        </button>
+        <button onclick="showTab('profiles')" class="nav-btn px-4 py-2 rounded-full text-sm font-bold text-slate-500 whitespace-nowrap">
+            <i class="fa-solid fa-user-group mr-1"></i> Profiles
+        </button>
+        <button onclick="showTab('new-time')" class="nav-btn px-4 py-2 rounded-full text-sm font-bold text-slate-500 whitespace-nowrap">
+            <i class="fa-solid fa-plus mr-1"></i> New Time
+        </button>
+        <button onclick="showTab('compare')" class="nav-btn px-4 py-2 rounded-full text-sm font-bold text-slate-500 whitespace-nowrap">
+            <i class="fa-solid fa-right-left mr-1"></i> Compare
+        </button>
+        <button onclick="showTab('records')" class="nav-btn px-4 py-2 rounded-full text-sm font-bold text-slate-500 whitespace-nowrap">
+            <i class="fa-solid fa-medal mr-1"></i> Records
+        </button>
+    </nav>
+
+    <main class="max-w-md mx-auto p-4">
+
+        <section id="leaderboard" class="tab-content bg-white rounded-3xl shadow-sm overflow-hidden">
+            <div class="bg-blue-600 p-6 text-white text-center">
+                <h2 class="text-xl font-bold">Points Leaderboard</h2>
+                <p class="text-blue-100 text-xs mt-1">1st = 20pts, decreasing by 1pt per position</p>
+            </div>
+            <div id="leaderboard-list">
+                </div>
+        </section>
+
+        <section id="new-time" class="tab-content hidden animate-fade-in">
+            <form onsubmit="saveTime(event)" class="bg-white p-6 rounded-3xl shadow-sm space-y-4">
+                <h2 class="text-xl font-bold border-b pb-2">Log New Time</h2>
+                
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Swimmer</label>
+                    <select id="swimmer" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200">
+                        <option>esteban</option><option>jonathan</option><option>My Profile</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Distance</label>
+                        <select id="distance" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200">
+                            <option>50m</option><option>100m</option><option>200m</option><option>400m</option>
+                            <option>800m</option><option>1500m</option><option>1km</option><option>1.5km</option>
+                            <option>2km</option><option>3km</option><option>5km</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Style</label>
+                        <select id="style" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200">
+                            <option>Freestyle</option><option>Butterfly</option><option>Breaststroke</option>
+                            <option>Backstroke</option><option>Medley</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-400 mb-1 text-center">Time (Min : Sec : Ms)</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="min" placeholder="00" class="w-1/3 p-3 bg-gray-50 rounded-xl text-center">
+                        <input type="number" id="sec" placeholder="00" required class="w-1/3 p-3 bg-gray-50 rounded-xl text-center">
+                        <input type="number" id="ms" placeholder="00" class="w-1/3 p-3 bg-gray-50 rounded-xl text-center">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Placement</label>
+                        <input type="number" id="placement" value="1" min="1" class="w-full p-3 bg-gray-50 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Pool Size</label>
+                        <select id="poolSize" class="w-full p-3 bg-gray-50 rounded-xl">
+                            <option>25m</option><option>50m</option><option>Aguas abiertas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <input type="text" id="competition" placeholder="Competition Name" class="w-full p-3 bg-gray-50 rounded-xl">
+                <input type="text" id="location" placeholder="Location" class="w-full p-3 bg-gray-50 rounded-xl">
+                <input type="date" id="date" class="w-full p-3 bg-gray-50 rounded-xl">
+
+                <button type="submit" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200">
+                    Save Result
+                </button>
+            </form>
+        </section>
+
+        <section id="records" class="tab-content hidden bg-white rounded-3xl p-6 shadow-sm">
+            <h2 class="text-xl font-bold mb-4 italic text-slate-700 underline decoration-blue-500">Personal & General Best</h2>
+            <div id="records-list">
+                </div>
+        </section>
+
+        <section id="profiles" class="tab-content hidden text-center p-10">
+            <i class="fa-solid fa-user-circle text-6xl text-gray-200 mb-4"></i>
+            <p class="text-gray-400">Section in development: Individual statistics per swimmer.</p>
+        </section>
+
+        <section id="compare" class="tab-content hidden text-center p-10">
+            <i class="fa-solid fa-chart-line text-6xl text-gray-200 mb-4"></i>
+            <p class="text-gray-400">Section in development: Head-to-head analysis.</p>
+        </section>
+
+    </main>
+
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwimTracker Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // CONFIGURACIÓN DE FIREBASE
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "tu-app.firebaseapp.com",
+            projectId: "tu-app",
+            storageBucket: "tu-app.appspot.com",
+            messagingSenderId: "12345678",
+            appId: "tu-app-id"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- NAVEGACIÓN ---
+        window.showTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            // Actualizar estilo de botones
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('bg-blue-600', 'text-white'));
+            event.currentTarget.classList.add('bg-blue-600', 'text-white');
+
+            if(tabId === 'leaderboard') loadLeaderboard();
+            if(tabId === 'records') loadRecords();
+            if(tabId === 'profiles') loadProfiles();
+        };
+
+        // --- LÓGICA DE GUARDADO ---
+        window.saveTime = async (e) => {
+            e.preventDefault();
+            const placement = parseInt(document.getElementById('placement').value);
+            const points = Math.max(0, 21 - placement);
+
+            const data = {
+                swimmer: document.getElementById('swimmer').value,
+                distance: document.getElementById('distance').value,
+                style: document.getElementById('style').value,
+                poolSize: document.getElementById('poolSize').value,
+                minutes: parseInt(document.getElementById('min').value || 0),
+                seconds: parseInt(document.getElementById('sec').value || 0),
+                ms: parseInt(document.getElementById('ms').value || 0),
+                placement,
+                points,
+                competition: document.getElementById('competition').value,
+                location: document.getElementById('location').value,
+                date: document.getElementById('date').value,
+                timestamp: Date.now()
+            };
+
+            await addDoc(collection(db, "swims"), data);
+            alert("Tiempo guardado!");
+            showTab('leaderboard');
+        };
+
+        // --- CARGAR LEADERBOARD ---
+        async function loadLeaderboard() {
+            const querySnapshot = await getDocs(collection(db, "swims"));
+            const totals = {};
+            querySnapshot.forEach(doc => {
+                const d = doc.data();
+                totals[d.swimmer] = (totals[d.swimmer] || 0) + d.points;
+            });
+
+            const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+            const container = document.getElementById('leaderboard-list');
+            container.innerHTML = sorted.map(([name, pts], i) => `
+                <div class="flex justify-between items-center p-4 border-b">
+                    <div class="flex items-center gap-4">
+                        <span class="text-xl font-bold ${i==0?'text-yellow-500':''}">${i+1}</span>
+                        <div>
+                            <p class="font-bold capitalize">${name}</p>
+                            <p class="text-xs text-gray-400">Swimmer</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xl font-bold text-blue-600">${pts}</p>
+                        <p class="text-[10px] uppercase text-gray-400 font-bold">Points</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- CARGAR RÉCORDS ---
+        async function loadRecords() {
+            const querySnapshot = await getDocs(collection(db, "swims"));
+            const records = {};
+            querySnapshot.forEach(doc => {
+                const d = doc.data();
+                const key = `${d.distance} ${d.style}`;
+                const totalMs = (d.minutes * 60000) + (d.seconds * 1000) + d.ms;
+                
+                if (!records[key] || totalMs < records[key].totalMs) {
+                    records[key] = { ...d, totalMs };
+                }
+            });
+
+            document.getElementById('records-list').innerHTML = Object.entries(records).map(([event, data]) => `
+                <div class="p-4 bg-gray-50 rounded-xl mb-2 flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-bold text-blue-500 uppercase">${event}</p>
+                        <p class="font-bold capitalize">${data.swimmer}</p>
+                    </div>
+                    <p class="text-lg font-mono">${data.minutes}:${data.seconds}.${data.ms}</p>
+                </div>
+            `).join('');
+        }
+
+        // Iniciar en Leaderboard
+        window.onload = () => loadLeaderboard();
+    </script>
+</head>
+<body class="bg-slate-50 min-h-screen pb-20">
+
+    <header class="bg-white p-6 text-center border-b sticky top-0 z-10">
+        <h1 class="text-2xl font-black text-slate-800 tracking-tight">
+            <i class="fa-solid fa-water text-blue-500"></i> SwimTracker
+        </h1>
+    </header>
+
+    <nav class="flex overflow-x-auto bg-white border-b px-2 py-3 gap-2 sticky top-[73px] z-10 no-scrollbar">
+        <button onclick="showTab('leaderboard')" class="nav-btn bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap">
+            <i class="fa-solid fa-trophy mr-1"></i> Leaderboard
+        </button>
+        <button onclick="showTab('profiles')" class="nav-btn px-4 py-2 rounded-full text-sm font-bold text-slate-500 whitespace-nowrap">
+            <i class="fa-solid fa-user-group mr-1"></i> Profiles
+        </button>
+        <button onclick="showTab('new-time')" class="nav-btn px-4 py-2 rounded-full text-sm font-bold text-slate-500 whitespace-nowrap">
+            <i class="fa-solid fa-plus mr-1"></i> New Time
+        </button>
+        <button onclick="showTab('compare')" class="nav-btn px-4 py-2 rounded-full text-sm font-bold text-slate-500 whitespace-nowrap">
+            <i class="fa-solid fa-right-left mr-1"></i> Compare
+        </button>
+        <button onclick="showTab('records')" class="nav-btn px-4 py-2 rounded-full text-sm font-bold text-slate-500 whitespace-nowrap">
+            <i class="fa-solid fa-medal mr-1"></i> Records
+        </button>
+    </nav>
+
+    <main class="max-w-md mx-auto p-4">
+
+        <section id="leaderboard" class="tab-content bg-white rounded-3xl shadow-sm overflow-hidden">
+            <div class="bg-blue-600 p-6 text-white text-center">
+                <h2 class="text-xl font-bold">Points Leaderboard</h2>
+                <p class="text-blue-100 text-xs mt-1">1st = 20pts, decreasing by 1pt per position</p>
+            </div>
+            <div id="leaderboard-list">
+                </div>
+        </section>
+
+        <section id="new-time" class="tab-content hidden animate-fade-in">
+            <form onsubmit="saveTime(event)" class="bg-white p-6 rounded-3xl shadow-sm space-y-4">
+                <h2 class="text-xl font-bold border-b pb-2">Log New Time</h2>
+                
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Swimmer</label>
+                    <select id="swimmer" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200">
+                        <option>esteban</option><option>jonathan</option><option>My Profile</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Distance</label>
+                        <select id="distance" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200">
+                            <option>50m</option><option>100m</option><option>200m</option><option>400m</option>
+                            <option>800m</option><option>1500m</option><option>1km</option><option>1.5km</option>
+                            <option>2km</option><option>3km</option><option>5km</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Style</label>
+                        <select id="style" class="w-full p-3 bg-gray-50 rounded-xl border-none ring-1 ring-gray-200">
+                            <option>Freestyle</option><option>Butterfly</option><option>Breaststroke</option>
+                            <option>Backstroke</option><option>Medley</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-400 mb-1 text-center">Time (Min : Sec : Ms)</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="min" placeholder="00" class="w-1/3 p-3 bg-gray-50 rounded-xl text-center">
+                        <input type="number" id="sec" placeholder="00" required class="w-1/3 p-3 bg-gray-50 rounded-xl text-center">
+                        <input type="number" id="ms" placeholder="00" class="w-1/3 p-3 bg-gray-50 rounded-xl text-center">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Placement</label>
+                        <input type="number" id="placement" value="1" min="1" class="w-full p-3 bg-gray-50 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Pool Size</label>
+                        <select id="poolSize" class="w-full p-3 bg-gray-50 rounded-xl">
+                            <option>25m</option><option>50m</option><option>Aguas abiertas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <input type="text" id="competition" placeholder="Competition Name" class="w-full p-3 bg-gray-50 rounded-xl">
+                <input type="text" id="location" placeholder="Location" class="w-full p-3 bg-gray-50 rounded-xl">
+                <input type="date" id="date" class="w-full p-3 bg-gray-50 rounded-xl">
+
+                <button type="submit" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200">
+                    Save Result
+                </button>
+            </form>
+        </section>
+
+        <section id="records" class="tab-content hidden bg-white rounded-3xl p-6 shadow-sm">
+            <h2 class="text-xl font-bold mb-4 italic text-slate-700 underline decoration-blue-500">Personal & General Best</h2>
+            <div id="records-list">
+                </div>
+        </section>
+
+        <section id="profiles" class="tab-content hidden text-center p-10">
+            <i class="fa-solid fa-user-circle text-6xl text-gray-200 mb-4"></i>
+            <p class="text-gray-400">Section in development: Individual statistics per swimmer.</p>
+        </section>
+
+        <section id="compare" class="tab-content hidden text-center p-10">
+            <i class="fa-solid fa-chart-line text-6xl text-gray-200 mb-4"></i>
+            <p class="text-gray-400">Section in development: Head-to-head analysis.</p>
+        </section>
+
+    </main>
+
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    </style>
+</body>
+</html>
