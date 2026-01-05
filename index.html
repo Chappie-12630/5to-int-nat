@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3144/3144573.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,120 +9,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        // CONFIGURACIÓN DE FIREBASE
-        const firebaseConfig = {
-            apiKey: "TU_API_KEY",
-            authDomain: "tu-app.firebaseapp.com",
-            projectId: "tu-app",
-            storageBucket: "tu-app.appspot.com",
-            messagingSenderId: "12345678",
-            appId: "tu-app-id"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // --- NAVEGACIÓN ---
-        window.showTab = (tabId) => {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
-            document.getElementById(tabId).classList.remove('hidden');
-            
-            // Actualizar estilo de botones
-            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('bg-blue-600', 'text-white'));
-            event.currentTarget.classList.add('bg-blue-600', 'text-white');
-
-            if(tabId === 'leaderboard') loadLeaderboard();
-            if(tabId === 'records') loadRecords();
-            if(tabId === 'profiles') loadProfiles();
-        };
-
-        // --- LÓGICA DE GUARDADO ---
-        window.saveTime = async (e) => {
-            e.preventDefault();
-            const placement = parseInt(document.getElementById('placement').value);
-            const points = Math.max(0, 21 - placement);
-
-            const data = {
-                swimmer: document.getElementById('swimmer').value,
-                distance: document.getElementById('distance').value,
-                style: document.getElementById('style').value,
-                poolSize: document.getElementById('poolSize').value,
-                minutes: parseInt(document.getElementById('min').value || 0),
-                seconds: parseInt(document.getElementById('sec').value || 0),
-                ms: parseInt(document.getElementById('ms').value || 0),
-                placement,
-                points,
-                competition: document.getElementById('competition').value,
-                location: document.getElementById('location').value,
-                date: document.getElementById('date').value,
-                timestamp: Date.now()
-            };
-
-            await addDoc(collection(db, "swims"), data);
-            alert("Tiempo guardado!");
-            showTab('leaderboard');
-        };
-
-        // --- CARGAR LEADERBOARD ---
-        async function loadLeaderboard() {
-            const querySnapshot = await getDocs(collection(db, "swims"));
-            const totals = {};
-            querySnapshot.forEach(doc => {
-                const d = doc.data();
-                totals[d.swimmer] = (totals[d.swimmer] || 0) + d.points;
-            });
-
-            const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
-            const container = document.getElementById('leaderboard-list');
-            container.innerHTML = sorted.map(([name, pts], i) => `
-                <div class="flex justify-between items-center p-4 border-b">
-                    <div class="flex items-center gap-4">
-                        <span class="text-xl font-bold ${i==0?'text-yellow-500':''}">${i+1}</span>
-                        <div>
-                            <p class="font-bold capitalize">${name}</p>
-                            <p class="text-xs text-gray-400">Swimmer</p>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-xl font-bold text-blue-600">${pts}</p>
-                        <p class="text-[10px] uppercase text-gray-400 font-bold">Points</p>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // --- CARGAR RÉCORDS ---
-        async function loadRecords() {
-            const querySnapshot = await getDocs(collection(db, "swims"));
-            const records = {};
-            querySnapshot.forEach(doc => {
-                const d = doc.data();
-                const key = `${d.distance} ${d.style}`;
-                const totalMs = (d.minutes * 60000) + (d.seconds * 1000) + d.ms;
-                
-                if (!records[key] || totalMs < records[key].totalMs) {
-                    records[key] = { ...d, totalMs };
-                }
-            });
-
-            document.getElementById('records-list').innerHTML = Object.entries(records).map(([event, data]) => `
-                <div class="p-4 bg-gray-50 rounded-xl mb-2 flex justify-between items-center">
-                    <div>
-                        <p class="text-xs font-bold text-blue-500 uppercase">${event}</p>
-                        <p class="font-bold capitalize">${data.swimmer}</p>
-                    </div>
-                    <p class="text-lg font-mono">${data.minutes}:${data.seconds}.${data.ms}</p>
-                </div>
-            `).join('');
-        }
-
-        // Iniciar en Leaderboard
-        window.onload = () => loadLeaderboard();
-    </script>
 </head>
 <body class="bg-slate-50 min-h-screen pb-20">
 
